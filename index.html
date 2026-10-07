@@ -222,7 +222,7 @@ footer .vb{font-size:15px;color:var(--ink);font-weight:700}
 
 <script>
 'use strict';
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.3';
 const STORE_KEY = 'tankHeadspace.v1';
 
 /* 預計值：吋為原始數據，mm = 吋 × 25.4（已逐一驗算） */
@@ -247,8 +247,12 @@ const TANKS = [
    ld:{f:'103.74 − 67.32', in:'36.42', mm:925.068}}
 ];
 
+/* 量測設備精度到 mm 整數，預計值一律四捨五入到整數，判定、差值、匯出都用整數值 */
+TANKS.forEach(t => ['lo','hi','ld'].forEach(k => { t[k].exact = t[k].mm; t[k].mm = Math.round(t[k].mm); }));
+
 const $ = id => document.getElementById(id);
 const fmt = n => String(Math.round(n * 1000) / 1000);
+const r0 = n => String(Math.round(n));   /* 預計值顯示到整數位（四捨五入） */
 const sgn = n => (n > 0 ? '+' : '') + fmt(n);
 const inStr = o => o.f === o.in ? o.in + ' 吋' : o.f + ' = ' + o.in + ' 吋';
 
@@ -330,10 +334,10 @@ function renderTabs(){
 function renderTank(){
   const t = T(), r = R();
   $('tName').textContent = t.id;
-  $('eExp').innerHTML = fmt(t.lo.mm) + ' ～ ' + fmt(t.hi.mm) + ' <small>mm</small>';
+  $('eExp').innerHTML = r0(t.lo.mm) + ' ～ ' + r0(t.hi.mm) + ' <small>mm</small>';
   $('eF').textContent = '下限 ' + inStr(t.lo) + '；上限 ' + inStr(t.hi);
   $('lTitle').textContent = '裝水 ' + t.kg + ' kg';
-  $('lExp').innerHTML = fmt(t.ld.mm) + ' <small>mm</small>';
+  $('lExp').innerHTML = r0(t.ld.mm) + ' <small>mm</small>';
   $('lF').textContent = inStr(t.ld);
   $('eD').value = r.eD; $('lKg').value = r.lKg; $('lD').value = r.lD; $('note').value = r.note;
   $('lKg').placeholder = '輸入 kg';
@@ -398,10 +402,10 @@ function renderSum(){
   $('sum').innerHTML = TANKS.map(t => {
     const o = evalTank(t);
     return '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td class="c0">' + t.id + '</td>' +
-      '<td class="num pre gs">' + fmt(t.lo.mm) + '～' + fmt(t.hi.mm) + '</td>' + act(o.eD) +
+      '<td class="num pre gs">' + r0(t.lo.mm) + '～' + r0(t.hi.mm) + '</td>' + act(o.eD) +
       '<td class="' + (o.eState || 'nil') + '">' + (o.eState === 'ok' ? '範圍內' : o.eState === 'bad' ? '超出' : '—') + '</td>' +
       '<td class="num pre gs">' + t.kg + '</td>' + act(o.lKg) +
-      '<td class="num pre gs">' + fmt(t.ld.mm) + '</td>' + act(o.lD) + '</tr>';
+      '<td class="num pre gs">' + r0(t.ld.mm) + '</td>' + act(o.lD) + '</tr>';
   }).join('');
 }
 
