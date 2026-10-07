@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#24343c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="槽頂距離">
+<title>槽頂距離紀錄</title>
+<style>
+:root{
+  --bg:#dfe5e8;--panel:#f7f9fa;--ink:#142229;--muted:#56666f;--line:#c3ccd1;
+  --steel:#24343c;--steel-ink:#e6eef2;--steel-mute:#9fb2bc;
+  --water:#2a78a8;--water-soft:#bcd8ea;--band:#7f8d95;--mark:#b97c00;--mark-soft:#f6e6c2;
+  --ok:#2c7a4c;--ok-bg:#dff0e5;--bad:#b3261e;--bad-bg:#f8e1df;
+  --f:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#10181c;--panel:#18232a;--ink:#e2eaee;--muted:#93a4ad;--line:#2c3c45;
+    --steel:#0b1215;--steel-ink:#dbe6ec;--steel-mute:#7f939d;
+    --water:#5aaedc;--water-soft:#1f4258;--band:#8a99a1;--mark:#f0b43c;--mark-soft:#3a2d10;
+    --ok:#6cc893;--ok-bg:#16301f;--bad:#f17d74;--bad-bg:#3a1714;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:16px;line-height:1.5;
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* 標題列 */
+.top{position:sticky;top:0;z-index:10;background:var(--steel);color:var(--steel-ink);
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 0}
+.r1{display:flex;align-items:center;gap:8px}
+.r1 h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.02em;flex:1}
+.ver{font-size:13px;font-weight:700;padding:2px 8px;border-radius:6px;background:#e6eef2;color:#24343c}
+.net{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--steel-mute);color:var(--steel-mute)}
+.net.off{border-color:#f0b43c;color:#f0b43c}
+.prog{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--steel-mute)}
+.bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#7cc3e8;transition:width .25s}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 0 10px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;min-width:68px;padding:8px 10px 7px;border-radius:8px;border:1px solid rgba(255,255,255,.18);
+  background:transparent;color:var(--steel-ink);font-weight:700;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.tab[aria-current="true"]{background:var(--steel-ink);color:var(--steel);border-color:var(--steel-ink)}
+.pips{display:flex;gap:3px}
+.pips b{width:7px;height:7px;border-radius:50%;border:1.5px solid currentColor;opacity:.55}
+.pips b.on{background:currentColor;opacity:1}
+
+main{max-width:640px;margin:0 auto;padding:14px 12px 24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card+.card{margin-top:14px}
+.op{display:flex;align-items:center;gap:10px}
+.op label{font-size:14px;color:var(--muted);flex:0 0 auto}
+.op input{flex:1;min-width:0}
+input[type=text],input:not([type]),textarea{width:100%;font-size:17px;padding:10px 12px;border:1.5px solid var(--line);
+  border-radius:8px;background:var(--bg);outline:none}
+input:focus,textarea:focus{border-color:var(--water)}
+input.err{border-color:var(--bad);background:var(--bad-bg)}
+
+/* 槽體 */
+.th{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.th h2{margin:0;font-size:34px;line-height:1.1;letter-spacing:.01em}
+.th span{font-size:13px;color:var(--muted);text-align:right}
+.tb{display:grid;grid-template-columns:78px 1fr;gap:12px}
+.gauge{width:78px;height:330px;display:block}
+.blk{border-left:4px solid var(--band);padding:2px 0 2px 12px}
+.blk+.blk{margin-top:18px}
+.blk.ld{border-left-color:var(--water)}
+.blk h3{margin:0 0 4px;font-size:18px}
+.exp{margin:0 0 8px}
+.exp .k{font-size:13px;color:var(--muted)}
+.exp .v{display:block;font-size:22px;font-weight:700;line-height:1.25}
+.exp .v small{font-size:14px;font-weight:400;color:var(--muted)}
+.exp .f{display:block;font-size:13px;color:var(--muted)}
+.fld{display:block;margin-top:8px}
+.fld>span{display:block;font-size:14px;color:var(--muted);margin-bottom:3px}
+.fld>.unit{display:flex;align-items:center;gap:8px;margin:0}
+.unit input{flex:1;min-width:0;font-size:20px;font-weight:700}
+.unit em{font-style:normal;color:var(--muted);width:24px}
+.res{margin:8px 0 0;font-size:15px;font-weight:700;padding:6px 10px;border-radius:8px;display:none}
+.res.show{display:block}
+.res.ok{background:var(--ok-bg);color:var(--ok)}
+.res.bad{background:var(--bad-bg);color:var(--bad)}
+.res.info{background:var(--water-soft);color:var(--ink)}
+.res.warn{background:var(--bad-bg);color:var(--bad)}
+.ts{margin:4px 0 0;font-size:12px;color:var(--muted);min-height:18px}
+.note{margin-top:16px}
+.note textarea{min-height:64px;resize:vertical}
+.acts{display:flex;gap:10px;margin-top:14px}
+.btn{flex:1;min-height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:16px}
+.btn.pri{background:var(--steel);color:var(--steel-ink);border-color:var(--steel)}
+.btn.dng{color:var(--bad);border-color:var(--bad)}
+
+/* 總覽 */
+.card h2.s{margin:0 0 8px;font-size:18px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:460px;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:400}
+th:first-child,td:first-child{text-align:left;font-weight:700}
+tbody tr{cursor:pointer}
+tbody tr.cur{background:var(--bg)}
+td.ok{color:var(--ok)} td.bad{color:var(--bad)}
+.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+
+footer{max-width:640px;margin:0 auto;padding:0 12px 28px;font-size:13px;color:var(--muted)}
+footer p{margin:4px 0}
+footer .vb{font-size:15px;color:var(--ink);font-weight:700}
+.lnk{background:none;border:none;padding:6px 0;color:var(--water);font-size:14px;text-decoration:underline}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);
+  background:var(--steel);color:var(--steel-ink);padding:10px 16px;border-radius:10px;font-size:15px;opacity:0;
+  pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;z-index:20}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="r1">
+    <h1>槽頂距離紀錄</h1>
+    <span class="ver" id="verTop"></span>
+    <span class="net" id="net">在線</span>
+  </div>
+  <div class="prog"><div class="bar"><i id="pbar"></i></div><span id="ptxt" class="num">0 / 18</span></div>
+  <nav class="tabs" id="tabs" aria-label="選擇桶槽"></nav>
+</header>
+
+<main>
+  <section class="card op">
+    <label for="op">紀錄人</label>
+    <input id="op" autocomplete="off" placeholder="姓名（選填，會一併匯出）">
+  </section>
+
+  <section class="card" id="tank">
+    <div class="th">
+      <h2 id="tName">PV005</h2>
+      <span>單位 mm<br>由槽頂往下量</span>
+    </div>
+    <div class="tb">
+      <svg class="gauge" id="gauge" viewBox="0 0 78 330" aria-hidden="true"></svg>
+      <div>
+        <div class="blk em">
+          <h3>空槽</h3>
+          <p class="exp"><span class="k">預計離槽頂距離</span>
+            <span class="v num" id="eExp"></span>
+            <span class="f" id="eF"></span></p>
+          <label class="fld"><span>實際離槽頂距離</span>
+            <span class="unit"><input id="eD" inputmode="decimal" autocomplete="off" enterkeyhint="next"><em>mm</em></span></label>
+          <p class="res" id="eRes"></p>
+          <p class="ts" id="eTs"></p>
+        </div>
+        <div class="blk ld">
+          <h3 id="lTitle">裝水</h3>
+          <p class="exp"><span class="k">預計離槽頂距離</span>
+            <span class="v num" id="lExp"></span>
+            <span class="f" id="lF"></span></p>
+          <label class="fld"><span>實際裝水量</span>
+            <span class="unit"><input id="lKg" inputmode="decimal" autocomplete="off" enterkeyhint="next"><em>kg</em></span></label>
+          <label class="fld"><span>實際離槽頂距離</span>
+            <span class="unit"><input id="lD" inputmode="decimal" autocomplete="off" enterkeyhint="done"><em>mm</em></span></label>
+          <p class="res" id="lRes"></p>
+          <p class="ts" id="lTs"></p>
+        </div>
+      </div>
+    </div>
+    <label class="fld note"><span>備註</span><textarea id="note" placeholder="量測位置、量測工具、異常狀況等"></textarea></label>
+    <div class="acts">
+      <button class="btn" id="prev">上一槽</button>
+      <button class="btn" id="next">下一槽</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="s">全部桶槽</h2>
+    <div class="tw">
+      <table>
+        <thead><tr><th>桶槽</th><th>空槽實測 mm</th><th>空槽判定</th><th>裝水 kg</th><th>裝水實測 mm</th><th>實測−預計 mm</th></tr></thead>
+        <tbody id="sum"></tbody>
+      </table>
+    </div>
+    <p class="hint">點任一列可切換到該桶槽。</p>
+    <div class="acts">
+      <button class="btn pri" id="csv">匯出 CSV</button>
+    </div>
+    <div class="acts">
+      <button class="btn dng" id="clrTank">清除目前桶槽</button>
+      <button class="btn dng" id="clrAll">清除全部</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p class="vb">目前版本 <span id="verFoot"></span></p>
+  <p id="swState">離線快取：檢查中</p>
+  <p id="saved">尚未儲存</p>
+  <button class="lnk" id="upd">更新到最新版本</button>
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const APP_VERSION = '1.0.0';
+const STORE_KEY = 'tankHeadspace.v1';
+
+/* 預計值：吋為原始數據，mm = 吋 × 25.4（已逐一驗算） */
+const TANKS = [
+  {id:'PV005', kg:80,
+   lo:{f:'30.9', in:'30.9', mm:784.86}, hi:{f:'30.9 + 4.2', in:'35.1', mm:891.54},
+   ld:{f:'(30.9 + 4.2) − 27.4', in:'7.7', mm:195.58}},
+  {id:'PV007', kg:200,
+   lo:{f:'33.76', in:'33.76', mm:857.504}, hi:{f:'38.39', in:'38.39', mm:975.106},
+   ld:{f:'38.39 − 28.66', in:'9.73', mm:247.142}},
+  {id:'PV008', kg:800,
+   lo:{f:'57.5 + 3.3 + 3.3', in:'64.1', mm:1628.14}, hi:{f:'71.5', in:'71.5', mm:1816.1},
+   ld:{f:'71.5 − 53.0', in:'18.5', mm:469.9}},
+  {id:'FE001', kg:50,
+   lo:{f:'35.4', in:'35.4', mm:899.16}, hi:{f:'37.8', in:'37.8', mm:960.12},
+   ld:{f:'37.8 − 25.3', in:'12.5', mm:317.5}},
+  {id:'FE002', kg:350,
+   lo:{f:'66.6', in:'66.6', mm:1691.64}, hi:{f:'71.2', in:'71.2', mm:1808.48},
+   ld:{f:'71.2 − 49.8', in:'21.4', mm:543.56}},
+  {id:'FE003', kg:1000,
+   lo:{f:'7.85 + 90.41 − 1.42', in:'96.84', mm:2459.736}, hi:{f:'103.74', in:'103.74', mm:2634.996},
+   ld:{f:'103.74 − 67.32', in:'36.42', mm:925.068}}
+];
+
+const $ = id => document.getElementById(id);
+const fmt = n => String(Math.round(n * 1000) / 1000);
+const sgn = n => (n > 0 ? '+' : '') + fmt(n);
+const inStr = o => o.f === o.in ? o.in + ' 吋' : o.f + ' = ' + o.in + ' 吋';
+
+function twNow(){
+  const p = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false}).formatToParts(new Date());
+  const g = t => p.find(x => x.type === t).value;
+  const h = g('hour') === '24' ? '00' : g('hour');
+  return {d: g('year') + '-' + g('month') + '-' + g('day'), t: h + ':' + g('minute') + ':' + g('second')};
+}
+const stamp = () => { const n = twNow(); return n.d + ' ' + n.t; };
+
+/* 數值解析：空白回傳 null，格式錯誤回傳 NaN */
+function num(v){
+  const s = String(v == null ? '' : v).trim().replace(/，/g, '.').replace(/,/g, '.');
+  if (s === '') return null;
+  if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+  return parseFloat(s);
+}
+const valid = v => { const n = num(v); return n !== null && !Number.isNaN(n); };
+
+/* ---------- 儲存 ---------- */
+function blank(){
+  const tanks = {};
+  TANKS.forEach(t => tanks[t.id] = {eD:'', eT:'', lKg:'', lD:'', lT:'', note:''});
+  return {op:'', cur:TANKS[0].id, tanks, savedAt:''};
+}
+function load(){
+  const b = blank();
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return b;
+    const s = JSON.parse(raw);
+    b.op = s.op || ''; b.savedAt = s.savedAt || '';
+    if (TANKS.some(t => t.id === s.cur)) b.cur = s.cur;
+    TANKS.forEach(t => { if (s.tanks && s.tanks[t.id]) Object.assign(b.tanks[t.id], s.tanks[t.id]); });
+  }catch(e){}
+  return b;
+}
+let S = load();
+function save(){
+  S.savedAt = stamp();
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(S));
+    $('saved').textContent = '最後儲存 ' + S.savedAt + '（存在這支手機的瀏覽器內）';
+  }catch(e){
+    $('saved').textContent = '儲存失敗：請關閉 Safari 無痕模式後重新開啟，並先匯出 CSV 保留資料';
+  }
+}
+const T = () => TANKS.find(t => t.id === S.cur);
+const R = id => S.tanks[id || S.cur];
+
+/* ---------- 計算 ---------- */
+function evalTank(t){
+  const r = R(t.id);
+  const eD = num(r.eD), lKg = num(r.lKg), lD = num(r.lD);
+  const o = {eD, lKg, lD, eState:'', eText:'', lDiff:null, filled:0};
+  if (valid(r.eD)) o.filled++;
+  if (valid(r.lKg)) o.filled++;
+  if (valid(r.lD)) o.filled++;
+  if (eD !== null && !Number.isNaN(eD)){
+    if (eD < t.lo.mm){ o.eState = 'bad'; o.eText = '低於下限 ' + fmt(t.lo.mm - eD) + ' mm'; }
+    else if (eD > t.hi.mm){ o.eState = 'bad'; o.eText = '高於上限 ' + fmt(eD - t.hi.mm) + ' mm'; }
+    else { o.eState = 'ok'; o.eText = '在預計範圍內'; }
+  }
+  if (lD !== null && !Number.isNaN(lD)) o.lDiff = lD - t.ld.mm;
+  return o;
+}
+
+/* ---------- 畫面 ---------- */
+function renderTabs(){
+  $('tabs').innerHTML = TANKS.map(t => {
+    const f = evalTank(t).filled;
+    const pips = [0,1,2].map(i => '<b class="' + (i < f ? 'on' : '') + '"></b>').join('');
+    return '<button class="tab" data-id="' + t.id + '" aria-current="' + (t.id === S.cur) + '">' + t.id +
+           '<span class="pips" aria-label="已填 ' + f + ' / 3">' + pips + '</span></button>';
+  }).join('');
+}
+function renderTank(){
+  const t = T(), r = R();
+  $('tName').textContent = t.id;
+  $('eExp').innerHTML = fmt(t.lo.mm) + ' ～ ' + fmt(t.hi.mm) + ' <small>mm</small>';
+  $('eF').textContent = '下限 ' + inStr(t.lo) + '；上限 ' + inStr(t.hi);
+  $('lTitle').textContent = '裝水 ' + t.kg + ' kg';
+  $('lExp').innerHTML = fmt(t.ld.mm) + ' <small>mm</small>';
+  $('lF').textContent = inStr(t.ld);
+  $('eD').value = r.eD; $('lKg').value = r.lKg; $('lD').value = r.lD; $('note').value = r.note;
+  $('lKg').placeholder = '輸入 kg';
+  $('eD').placeholder = $('lD').placeholder = '輸入 mm';
+  refresh();
+}
+function setRes(el, cls, text){
+  el.className = 'res' + (text ? ' show ' + cls : '');
+  el.textContent = text || '';
+}
+function refresh(){
+  const t = T(), r = R(), o = evalTank(t);
+  ['eD','lKg','lD'].forEach(k => $(k).classList.toggle('err', Number.isNaN(num(r[k]))));
+
+  if (Number.isNaN(o.eD)) setRes($('eRes'), 'warn', '請輸入數字，例如 902.5');
+  else setRes($('eRes'), o.eState, o.eText);
+
+  if (Number.isNaN(o.lKg) || Number.isNaN(o.lD)) setRes($('lRes'), 'warn', '請輸入數字，例如 320');
+  else if (o.lDiff !== null) setRes($('lRes'), 'info', '實測 − 預計 = ' + sgn(o.lDiff) + ' mm');
+  else setRes($('lRes'), '', '');
+
+  $('eTs').textContent = r.eT ? '紀錄時間 ' + r.eT : '';
+  $('lTs').textContent = r.lT ? '紀錄時間 ' + r.lT : '';
+
+  drawGauge(t, o);
+  renderTabs();
+  renderSum();
+  let done = 0;
+  TANKS.forEach(x => done += evalTank(x).filled);
+  $('ptxt').textContent = done + ' / ' + (TANKS.length * 3);
+  $('pbar').style.width = (done / (TANKS.length * 3) * 100) + '%';
+}
+
+/* 槽體剖面：0 = 槽頂，往下為距離 */
+function drawGauge(t, o){
+  const ok = v => v !== null && !Number.isNaN(v);
+  const maxD = Math.max(t.hi.mm, ok(o.eD) ? o.eD : 0, ok(o.lD) ? o.lD : 0) * 1.06;
+  const top = 22, bot = 322, x0 = 20, x1 = 66;
+  const y = d => top + Math.min(d, maxD) / maxD * (bot - top);
+  const css = getComputedStyle(document.documentElement);
+  const c = n => css.getPropertyValue(n).trim();
+  let s = '<defs><pattern id="hz" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">' +
+          '<line x1="0" y1="0" x2="0" y2="6" stroke="' + c('--band') + '" stroke-width="2"/></pattern></defs>';
+  s += '<text x="43" y="12" text-anchor="middle" font-size="11" fill="' + c('--muted') + '">槽頂</text>';
+  if (ok(o.lD)) s += '<rect x="' + x0 + '" y="' + y(o.lD) + '" width="' + (x1 - x0) + '" height="' + (bot - y(o.lD)) + '" fill="' + c('--water-soft') + '"/>';
+  s += '<rect x="' + x0 + '" y="' + y(t.lo.mm) + '" width="' + (x1 - x0) + '" height="' + Math.max(2, y(t.hi.mm) - y(t.lo.mm)) +
+       '" fill="url(#hz)" opacity=".75"/>';
+  s += '<line x1="' + (x0 - 4) + '" y1="' + y(t.ld.mm) + '" x2="' + (x1 + 4) + '" y2="' + y(t.ld.mm) + '" stroke="' + c('--water') +
+       '" stroke-width="2" stroke-dasharray="4 3"/>';
+  if (ok(o.lD)) s += '<line x1="' + x0 + '" y1="' + y(o.lD) + '" x2="' + x1 + '" y2="' + y(o.lD) + '" stroke="' + c('--water') + '" stroke-width="3"/>' +
+       '<path d="M' + (x1 + 2) + ' ' + y(o.lD) + ' l9 -6 v12 z" fill="' + c('--water') + '"/>';
+  if (ok(o.eD)) s += '<line x1="' + x0 + '" y1="' + y(o.eD) + '" x2="' + x1 + '" y2="' + y(o.eD) + '" stroke="' + c('--mark') + '" stroke-width="3"/>' +
+       '<path d="M' + (x0 - 2) + ' ' + y(o.eD) + ' l-9 -6 v12 z" fill="' + c('--mark') + '"/>';
+  s += '<path d="M' + x0 + ' ' + top + ' V' + bot + ' H' + x1 + ' V' + top + '" fill="none" stroke="' + c('--ink') + '" stroke-width="2"/>';
+  s += '<line x1="' + (x0 - 8) + '" y1="' + top + '" x2="' + (x1 + 8) + '" y2="' + top + '" stroke="' + c('--ink') + '" stroke-width="3"/>';
+  $('gauge').innerHTML = s;
+}
+
+function renderSum(){
+  $('sum').innerHTML = TANKS.map(t => {
+    const r = R(t.id), o = evalTank(t);
+    const ok = v => v !== null && !Number.isNaN(v);
+    return '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td>' + t.id + '</td>' +
+      '<td class="num">' + (ok(o.eD) ? fmt(o.eD) : '—') + '</td>' +
+      '<td class="' + o.eState + '">' + (o.eState === 'ok' ? '範圍內' : o.eState === 'bad' ? '超出' : '—') + '</td>' +
+      '<td class="num">' + (ok(o.lKg) ? fmt(o.lKg) : '—') + '</td>' +
+      '<td class="num">' + (ok(o.lD) ? fmt(o.lD) : '—') + '</td>' +
+      '<td class="num">' + (o.lDiff !== null ? sgn(o.lDiff) : '—') + '</td></tr>';
+  }).join('');
+}
+
+function go(id){
+  S.cur = id; save(); renderTank();
+  window.scrollTo({top:0, behavior:'smooth'});
+  const b = document.querySelector('.tab[data-id="' + id + '"]');
+  if (b) b.scrollIntoView({inline:'center', block:'nearest'});
+}
+
+let tmr;
+function toast(m){
+  const el = $('toast'); el.textContent = m; el.classList.add('show');
+  clearTimeout(tmr); tmr = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ---------- 輸入 ---------- */
+function bindNum(key, tsKey, group){
+  $(key).addEventListener('input', e => {
+    const r = R();
+    r[key] = e.target.value;
+    const any = group.some(k => String(r[k]).trim() !== '');
+    r[tsKey] = any ? stamp() : '';
+    save(); refresh();
+  });
+}
+bindNum('eD', 'eT', ['eD']);
+bindNum('lKg', 'lT', ['lKg','lD']);
+bindNum('lD', 'lT', ['lKg','lD']);
+$('note').addEventListener('input', e => { R().note = e.target.value; save(); });
+$('op').addEventListener('input', e => { S.op = e.target.value; save(); });
+$('eD').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('lKg').focus(); } });
+$('lKg').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('lD').focus(); } });
+$('lD').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+
+$('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) go(b.dataset.id); });
+$('sum').addEventListener('click', e => { const tr = e.target.closest('tr'); if (tr) go(tr.dataset.id); });
+$('prev').addEventListener('click', () => { const i = TANKS.findIndex(t => t.id === S.cur); go(TANKS[(i + TANKS.length - 1) % TANKS.length].id); });
+$('next').addEventListener('click', () => { const i = TANKS.findIndex(t => t.id === S.cur); go(TANKS[(i + 1) % TANKS.length].id); });
+
+$('clrTank').addEventListener('click', () => {
+  if (!confirm('清除 ' + S.cur + ' 的所有實測值與備註？此動作無法復原。')) return;
+  S.tanks[S.cur] = {eD:'', eT:'', lKg:'', lD:'', lT:'', note:''};
+  save(); renderTank(); toast('已清除 ' + S.cur);
+});
+$('clrAll').addEventListener('click', () => {
+  if (!confirm('清除全部 6 個桶槽的實測值、備註與紀錄人？建議先匯出 CSV。此動作無法復原。')) return;
+  const cur = S.cur; S = blank(); S.cur = cur;
+  $('op').value = ''; save(); renderTank(); toast('已清除全部資料');
+});
+
+/* ---------- 匯出 CSV ---------- */
+function csvText(){
+  const head = ['桶槽','項目','預計裝水量(kg)','預計值計算式(吋)','預計離槽頂距離下限(mm)','預計離槽頂距離上限(mm)',
+                '實際裝水量(kg)','實際離槽頂距離(mm)','實測-預計(mm)','判定','紀錄時間(台灣)','備註','紀錄人','App版本','匯出時間(台灣)'];
+  const exp = stamp(), rows = [];
+  TANKS.forEach(t => {
+    const r = R(t.id), o = evalTank(t);
+    rows.push([t.id, '空槽', '', '下限 ' + inStr(t.lo) + '；上限 ' + inStr(t.hi), fmt(t.lo.mm), fmt(t.hi.mm),
+               '', r.eD.trim(), '', o.eText, r.eT, r.note, S.op, 'v' + APP_VERSION, exp]);
+    rows.push([t.id, '裝水 ' + t.kg + ' kg', t.kg, inStr(t.ld), fmt(t.ld.mm), fmt(t.ld.mm),
+               r.lKg.trim(), r.lD.trim(), o.lDiff !== null ? sgn(o.lDiff) : '', '', r.lT, r.note, S.op, 'v' + APP_VERSION, exp]);
+  });
+  const q = v => { v = v == null ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  return '\uFEFF' + [head, ...rows].map(r => r.map(q).join(',')).join('\r\n');
+}
+async function deliver(blob, name){
+  if (navigator.canShare){
+    try{
+      const file = new File([blob], name, {type: blob.type});
+      if (navigator.canShare({files:[file]})){
+        await navigator.share({files:[file]});
+        toast('已產生 ' + name);
+        return;
+      }
+    }catch(e){ if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('已下載 ' + name);
+}
+$('csv').addEventListener('click', () => {
+  const n = twNow();
+  const name = '槽頂距離紀錄_' + n.d.replace(/-/g, '') + '_' + n.t.replace(/:/g, '') + '_v' + APP_VERSION + '.csv';
+  deliver(new Blob([csvText()], {type:'text/csv;charset=utf-8'}), name);
+});
+
+/* ---------- 網路、離線快取、更新 ---------- */
+function net(){
+  const on = navigator.onLine;
+  $('net').textContent = on ? '在線' : '離線中';
+  $('net').classList.toggle('off', !on);
+}
+addEventListener('online', net); addEventListener('offline', net);
+addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready)
+    .then(() => { $('swState').textContent = '離線快取：已就緒（斷網也能開啟）'; })
+    .catch(() => { $('swState').textContent = '離線快取：啟用失敗，斷網時請勿關閉此頁'; });
+} else {
+  $('swState').textContent = '離線快取：未啟用（需從 GitHub Pages 網址開啟）';
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+$('upd').addEventListener('click', async () => {
+  if (!navigator.onLine){ toast('目前離線，連上網路後再更新'); return; }
+  if (!confirm('重新下載最新版本？已填資料會保留。')) return;
+  save();
+  try{
+    if ('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches){ const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); }
+  }catch(e){}
+  location.replace(location.pathname + '?v=' + Date.now());
+});
+
+/* ---------- 啟動 ---------- */
+$('verTop').textContent = 'v' + APP_VERSION;
+$('verFoot').textContent = 'v' + APP_VERSION;
+document.title = '槽頂距離紀錄 v' + APP_VERSION;
+$('op').value = S.op;
+if (S.savedAt) $('saved').textContent = '最後儲存 ' + S.savedAt + '（存在這支手機的瀏覽器內）';
+net(); renderTank();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refresh);
+</script>
+</body>
+</html>
