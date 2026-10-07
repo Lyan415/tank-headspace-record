@@ -102,7 +102,7 @@ input.err{border-color:var(--bad);background:var(--bad-bg)}
 #exList .blk{margin-top:18px}
 .add{width:100%;margin-top:18px;min-height:50px;border-radius:10px;border:1.5px dashed var(--water);background:transparent;
   color:var(--water);font-weight:700;font-size:16px}
-td.c0.sub{font-weight:400;color:var(--muted);padding-left:18px}
+thead tr:last-child th{vertical-align:bottom}
 .note textarea{min-height:64px;resize:vertical}
 .acts{display:flex;gap:10px;margin-top:14px}
 .btn{flex:1;min-height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:16px}
@@ -202,13 +202,7 @@ footer .vb{font-size:15px;color:var(--ink);font-weight:700}
     <h2 class="s">全部桶槽</h2>
     <div class="tw">
       <table>
-        <thead>
-          <tr><th class="c0" rowspan="2">桶槽</th>
-            <th class="grp" colspan="3">空槽離槽頂距離（mm）</th>
-            <th class="grp" colspan="2">裝水量（kg）</th>
-            <th class="grp" colspan="2">裝水後離槽頂距離（mm）</th></tr>
-          <tr><th>預計</th><th>實測</th><th>判定</th><th>預計</th><th>實測</th><th>預計</th><th>實測</th></tr>
-        </thead>
+        <thead id="sumHead"></thead>
         <tbody id="sum"></tbody>
       </table>
     </div>
@@ -233,7 +227,7 @@ footer .vb{font-size:15px;color:var(--ink);font-weight:700}
 
 <script>
 'use strict';
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.2';
 const STORE_KEY = 'tankHeadspace.v1';
 
 /* 預計值：吋為原始數據，mm = 吋 × 25.4（已逐一驗算） */
@@ -460,18 +454,30 @@ function drawGauge(t, o){
 function renderSum(){
   const ok = v => v !== null && !Number.isNaN(v);
   const act = v => ok(v) ? '<td class="num act">' + fmt(v) + '</td>' : '<td class="num act nil">—</td>';
+  /* 新增數據放在同一槽那一列的後方欄位；欄數依各槽最多筆數決定 */
+  const maxN = Math.max(0, ...TANKS.map(t => R(t.id).extra.length));
+  let h1 = '<tr><th class="c0" rowspan="2">桶槽</th>' +
+    '<th class="grp" colspan="3">空槽離槽頂距離（mm）</th>' +
+    '<th class="grp" colspan="2">裝水量（kg）</th>' +
+    '<th class="grp" colspan="2">裝水後離槽頂距離（mm）</th>';
+  let h2 = '<tr><th>預計</th><th>實測</th><th>判定</th><th>預計</th><th>實測</th><th>預計</th><th>實測</th>';
+  for (let i = 0; i < maxN; i++){
+    h1 += '<th class="grp" colspan="2">新增數據 ' + (i + 1) + '</th>';
+    h2 += '<th>實際裝水量<br>（kg）</th><th>實際離槽頂距離<br>（mm）</th>';
+  }
+  $('sumHead').innerHTML = h1 + '</tr>' + h2 + '</tr>';
   $('sum').innerHTML = TANKS.map(t => {
-    const o = evalTank(t);
-    return '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td class="c0">' + t.id + '</td>' +
+    const o = evalTank(t), ex = R(t.id).extra;
+    let row = '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td class="c0">' + t.id + '</td>' +
       '<td class="num pre gs">' + r0(t.lo.mm) + '～' + r0(t.hi.mm) + '</td>' + act(o.eD) +
       '<td class="' + (o.eState || 'nil') + '">' + (o.eState === 'ok' ? '範圍內' : o.eState === 'bad' ? '超出' : '—') + '</td>' +
       '<td class="num pre gs">' + t.kg + '</td>' + act(o.lKg) +
-      '<td class="num pre gs">' + r0(t.ld.mm) + '</td>' + act(o.lD) + '</tr>' +
-      R(t.id).extra.map((x, i) =>
-        '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td class="c0 sub">新增 ' + (i + 1) + '</td>' +
-        '<td class="nil gs"></td><td class="nil"></td><td class="nil"></td>' +
-        '<td class="num pre gs">—</td>' + act(num(x.kg)) +
-        '<td class="num pre gs">—</td>' + act(num(x.d)) + '</tr>').join('');
+      '<td class="num pre gs">' + r0(t.ld.mm) + '</td>' + act(o.lD);
+    for (let i = 0; i < maxN; i++){
+      if (i < ex.length) row += act(num(ex[i].kg)).replace('<td class="', '<td class="gs ') + act(num(ex[i].d));
+      else row += '<td class="gs"></td><td></td>';
+    }
+    return row + '</tr>';
   }).join('');
 }
 
@@ -525,19 +531,26 @@ $('clrAll').addEventListener('click', () => {
 
 /* ---------- 匯出 CSV ---------- */
 function csvText(){
-  const head = ['桶槽','項目','預計裝水量(kg)','預計值計算式(吋)','預計離槽頂距離下限(mm)','預計離槽頂距離上限(mm)',
-                '實際裝水量(kg)','實際離槽頂距離(mm)','實測-預計(mm)','判定','紀錄時間(台灣)','備註','紀錄人','App版本','匯出時間(台灣)'];
-  const exp = stamp(), rows = [];
-  TANKS.forEach(t => {
+  /* 一槽一列，與畫面「全部桶槽」表格相同排列；預計值在實測值前一欄 */
+  const maxN = Math.max(0, ...TANKS.map(t => R(t.id).extra.length));
+  const head = ['桶槽',
+    '空槽 預計值計算式(吋)','空槽 預計離槽頂距離下限(mm)','空槽 預計離槽頂距離上限(mm)','空槽 實際離槽頂距離(mm)','空槽 判定','空槽 紀錄時間(台灣)',
+    '裝水 預計值計算式(吋)','裝水 預計裝水量(kg)','裝水 實際裝水量(kg)','裝水 預計離槽頂距離(mm)','裝水 實際離槽頂距離(mm)','裝水 紀錄時間(台灣)'];
+  for (let i = 1; i <= maxN; i++)
+    head.push('新增數據' + i + ' 實際裝水量(kg)', '新增數據' + i + ' 實際離槽頂距離(mm)', '新增數據' + i + ' 紀錄時間(台灣)');
+  head.push('備註','紀錄人','App版本','匯出時間(台灣)');
+  const exp = stamp();
+  const rows = TANKS.map(t => {
     const r = R(t.id), o = evalTank(t);
-    rows.push([t.id, '空槽', '', '下限 ' + inStr(t.lo) + '；上限 ' + inStr(t.hi), fmt(t.lo.mm), fmt(t.hi.mm),
-               '', r.eD.trim(), '', o.eText, r.eT, r.note, S.op, 'v' + APP_VERSION, exp]);
-    rows.push([t.id, '裝水 ' + t.kg + ' kg', t.kg, inStr(t.ld), fmt(t.ld.mm), fmt(t.ld.mm),
-               r.lKg.trim(), r.lD.trim(), o.lDiff !== null ? sgn(o.lDiff) : '', '', r.lT, r.note, S.op, 'v' + APP_VERSION, exp]);
-    r.extra.forEach((x, i) => {
-      rows.push([t.id, '新增數據 ' + (i + 1), '', '', '', '',
-                 String(x.kg).trim(), String(x.d).trim(), '', '', x.t, r.note, S.op, 'v' + APP_VERSION, exp]);
-    });
+    const row = [t.id,
+      '下限 ' + inStr(t.lo) + '；上限 ' + inStr(t.hi), fmt(t.lo.mm), fmt(t.hi.mm), r.eD.trim(), o.eText, r.eT,
+      inStr(t.ld), t.kg, r.lKg.trim(), fmt(t.ld.mm), r.lD.trim(), r.lT];
+    for (let i = 0; i < maxN; i++){
+      const x = r.extra[i];
+      row.push(x ? String(x.kg).trim() : '', x ? String(x.d).trim() : '', x ? x.t : '');
+    }
+    row.push(r.note, S.op, 'v' + APP_VERSION, exp);
+    return row;
   });
   const q = v => { v = v == null ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   return '\uFEFF' + [head, ...rows].map(r => r.map(q).join(',')).join('\r\n');
