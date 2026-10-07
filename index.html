@@ -94,6 +94,15 @@ input.err{border-color:var(--bad);background:var(--bad-bg)}
 .res.warn{background:var(--bad-bg);color:var(--bad)}
 .ts{margin:4px 0 0;font-size:12px;color:var(--muted);min-height:18px}
 .note{margin-top:16px}
+.blk.ex{border-left-color:var(--water);border-left-style:dashed}
+.exh{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.exh h3{margin:0}
+.del{background:none;border:1px solid var(--bad);color:var(--bad);border-radius:8px;padding:4px 10px;font-size:14px;font-weight:700}
+.exn{margin:4px 0 0;font-size:13px;color:var(--muted)}
+#exList .blk{margin-top:18px}
+.add{width:100%;margin-top:18px;min-height:50px;border-radius:10px;border:1.5px dashed var(--water);background:transparent;
+  color:var(--water);font-weight:700;font-size:16px}
+td.c0.sub{font-weight:400;color:var(--muted);padding-left:18px}
 .note textarea{min-height:64px;resize:vertical}
 .acts{display:flex;gap:10px;margin-top:14px}
 .btn{flex:1;min-height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:16px}
@@ -178,6 +187,8 @@ footer .vb{font-size:15px;color:var(--ink);font-weight:700}
           <p class="res" id="lRes"></p>
           <p class="ts" id="lTs"></p>
         </div>
+        <div id="exList"></div>
+        <button class="add" id="addEx">＋ 新增一筆數據</button>
       </div>
     </div>
     <label class="fld note"><span>備註</span><textarea id="note" placeholder="量測位置、量測工具、異常狀況等"></textarea></label>
@@ -222,7 +233,7 @@ footer .vb{font-size:15px;color:var(--ink);font-weight:700}
 
 <script>
 'use strict';
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.1.0';
 const STORE_KEY = 'tankHeadspace.v1';
 
 /* 預計值：吋為原始數據，mm = 吋 × 25.4（已逐一驗算） */
@@ -275,9 +286,10 @@ function num(v){
 const valid = v => { const n = num(v); return n !== null && !Number.isNaN(n); };
 
 /* ---------- 儲存 ---------- */
+const blankTank = () => ({eD:'', eT:'', lKg:'', lD:'', lT:'', note:'', extra:[]});
 function blank(){
   const tanks = {};
-  TANKS.forEach(t => tanks[t.id] = {eD:'', eT:'', lKg:'', lD:'', lT:'', note:''});
+  TANKS.forEach(t => tanks[t.id] = blankTank());
   return {op:'', cur:TANKS[0].id, tanks, savedAt:''};
 }
 function load(){
@@ -288,7 +300,8 @@ function load(){
     const s = JSON.parse(raw);
     b.op = s.op || ''; b.savedAt = s.savedAt || '';
     if (TANKS.some(t => t.id === s.cur)) b.cur = s.cur;
-    TANKS.forEach(t => { if (s.tanks && s.tanks[t.id]) Object.assign(b.tanks[t.id], s.tanks[t.id]); });
+    TANKS.forEach(t => { if (s.tanks && s.tanks[t.id]) Object.assign(b.tanks[t.id], s.tanks[t.id]);
+      if (!Array.isArray(b.tanks[t.id].extra)) b.tanks[t.id].extra = []; });
   }catch(e){}
   return b;
 }
@@ -341,9 +354,54 @@ function renderTank(){
   $('lF').textContent = inStr(t.ld);
   $('eD').value = r.eD; $('lKg').value = r.lKg; $('lD').value = r.lD; $('note').value = r.note;
   $('lKg').placeholder = '輸入 kg';
+  renderExtra();
   $('eD').placeholder = $('lD').placeholder = '輸入 mm';
   refresh();
 }
+/* ---------- 新增的數據（其他裝填量） ---------- */
+const esc = v => String(v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderExtra(){
+  const list = R().extra;
+  $('exList').innerHTML = list.map((x, i) =>
+    '<div class="blk ex" data-i="' + i + '">' +
+      '<div class="exh"><h3>新增數據 ' + (i + 1) + '</h3><button class="del" data-del="' + i + '">刪除</button></div>' +
+      '<p class="exn">無預計值，僅記錄實測</p>' +
+      '<label class="fld"><span>實際裝水量</span><span class="unit"><input data-k="kg" data-i="' + i + '" inputmode="decimal" autocomplete="off" placeholder="輸入 kg" value="' + esc(x.kg) + '"><em>kg</em></span></label>' +
+      '<label class="fld"><span>實際離槽頂距離</span><span class="unit"><input data-k="d" data-i="' + i + '" inputmode="decimal" autocomplete="off" placeholder="輸入 mm" value="' + esc(x.d) + '"><em>mm</em></span></label>' +
+      '<p class="res" data-res="' + i + '"></p>' +
+      '<p class="ts" data-ts="' + i + '">' + (x.t ? '紀錄時間 ' + x.t : '') + '</p>' +
+    '</div>').join('');
+  refreshExtra();
+}
+function refreshExtra(){
+  R().extra.forEach((x, i) => {
+    const bad = Number.isNaN(num(x.kg)) || Number.isNaN(num(x.d));
+    $('exList').querySelectorAll('input[data-i="' + i + '"]').forEach(inp => inp.classList.toggle('err', Number.isNaN(num(x[inp.dataset.k]))));
+    setRes($('exList').querySelector('[data-res="' + i + '"]'), 'warn', bad ? '請輸入數字，例如 320' : '');
+    $('exList').querySelector('[data-ts="' + i + '"]').textContent = x.t ? '紀錄時間 ' + x.t : '';
+  });
+}
+$('addEx').addEventListener('click', () => {
+  R().extra.push({kg:'', d:'', t:''});
+  save(); renderExtra(); refresh();
+  const ins = $('exList').querySelectorAll('input[data-k="kg"]');
+  if (ins.length) ins[ins.length - 1].focus();
+});
+$('exList').addEventListener('input', e => {
+  const inp = e.target.closest('input[data-i]'); if (!inp) return;
+  const x = R().extra[+inp.dataset.i]; if (!x) return;
+  x[inp.dataset.k] = inp.value;
+  x.t = (String(x.kg).trim() !== '' || String(x.d).trim() !== '') ? stamp() : '';
+  save(); refreshExtra(); refresh();
+});
+$('exList').addEventListener('click', e => {
+  const b = e.target.closest('[data-del]'); if (!b) return;
+  const i = +b.dataset.del;
+  if (!confirm('刪除 ' + S.cur + ' 的「新增數據 ' + (i + 1) + '」？此動作無法復原。')) return;
+  R().extra.splice(i, 1);
+  save(); renderExtra(); refresh(); toast('已刪除');
+});
+
 function setRes(el, cls, text){
   el.className = 'res' + (text ? ' show ' + cls : '');
   el.textContent = text || '';
@@ -374,7 +432,8 @@ function refresh(){
 /* 槽體剖面：0 = 槽頂，往下為距離 */
 function drawGauge(t, o){
   const ok = v => v !== null && !Number.isNaN(v);
-  const maxD = Math.max(t.hi.mm, ok(o.eD) ? o.eD : 0, ok(o.lD) ? o.lD : 0) * 1.06;
+  const exD = R(t.id).extra.map(x => num(x.d)).filter(ok);
+  const maxD = Math.max(t.hi.mm, ok(o.eD) ? o.eD : 0, ok(o.lD) ? o.lD : 0, ...exD) * 1.06;
   const top = 22, bot = 322, x0 = 20, x1 = 66;
   const y = d => top + Math.min(d, maxD) / maxD * (bot - top);
   const css = getComputedStyle(document.documentElement);
@@ -387,6 +446,8 @@ function drawGauge(t, o){
        '" fill="url(#hz)" opacity=".75"/>';
   s += '<line x1="' + (x0 - 4) + '" y1="' + y(t.ld.mm) + '" x2="' + (x1 + 4) + '" y2="' + y(t.ld.mm) + '" stroke="' + c('--water') +
        '" stroke-width="2" stroke-dasharray="4 3"/>';
+  exD.forEach(d => { s += '<line x1="' + x0 + '" y1="' + y(d) + '" x2="' + x1 + '" y2="' + y(d) + '" stroke="' + c('--water') + '" stroke-width="1.5" stroke-dasharray="2 2"/>' +
+       '<circle cx="' + (x1 + 6) + '" cy="' + y(d) + '" r="3" fill="' + c('--water') + '"/>'; });
   if (ok(o.lD)) s += '<line x1="' + x0 + '" y1="' + y(o.lD) + '" x2="' + x1 + '" y2="' + y(o.lD) + '" stroke="' + c('--water') + '" stroke-width="3"/>' +
        '<path d="M' + (x1 + 2) + ' ' + y(o.lD) + ' l9 -6 v12 z" fill="' + c('--water') + '"/>';
   if (ok(o.eD)) s += '<line x1="' + x0 + '" y1="' + y(o.eD) + '" x2="' + x1 + '" y2="' + y(o.eD) + '" stroke="' + c('--mark') + '" stroke-width="3"/>' +
@@ -405,7 +466,12 @@ function renderSum(){
       '<td class="num pre gs">' + r0(t.lo.mm) + '～' + r0(t.hi.mm) + '</td>' + act(o.eD) +
       '<td class="' + (o.eState || 'nil') + '">' + (o.eState === 'ok' ? '範圍內' : o.eState === 'bad' ? '超出' : '—') + '</td>' +
       '<td class="num pre gs">' + t.kg + '</td>' + act(o.lKg) +
-      '<td class="num pre gs">' + r0(t.ld.mm) + '</td>' + act(o.lD) + '</tr>';
+      '<td class="num pre gs">' + r0(t.ld.mm) + '</td>' + act(o.lD) + '</tr>' +
+      R(t.id).extra.map((x, i) =>
+        '<tr data-id="' + t.id + '" class="' + (t.id === S.cur ? 'cur' : '') + '"><td class="c0 sub">新增 ' + (i + 1) + '</td>' +
+        '<td class="nil gs"></td><td class="nil"></td><td class="nil"></td>' +
+        '<td class="num pre gs">—</td>' + act(num(x.kg)) +
+        '<td class="num pre gs">—</td>' + act(num(x.d)) + '</tr>').join('');
   }).join('');
 }
 
@@ -447,12 +513,12 @@ $('prev').addEventListener('click', () => { const i = TANKS.findIndex(t => t.id 
 $('next').addEventListener('click', () => { const i = TANKS.findIndex(t => t.id === S.cur); go(TANKS[(i + 1) % TANKS.length].id); });
 
 $('clrTank').addEventListener('click', () => {
-  if (!confirm('清除 ' + S.cur + ' 的所有實測值與備註？此動作無法復原。')) return;
-  S.tanks[S.cur] = {eD:'', eT:'', lKg:'', lD:'', lT:'', note:''};
+  if (!confirm('清除 ' + S.cur + ' 的所有實測值、新增的數據與備註？此動作無法復原。')) return;
+  S.tanks[S.cur] = blankTank();
   save(); renderTank(); toast('已清除 ' + S.cur);
 });
 $('clrAll').addEventListener('click', () => {
-  if (!confirm('清除全部 6 個桶槽的實測值、備註與紀錄人？建議先匯出 CSV。此動作無法復原。')) return;
+  if (!confirm('清除全部 6 個桶槽的實測值、新增的數據、備註與紀錄人？建議先匯出 CSV。此動作無法復原。')) return;
   const cur = S.cur; S = blank(); S.cur = cur;
   $('op').value = ''; save(); renderTank(); toast('已清除全部資料');
 });
@@ -468,6 +534,10 @@ function csvText(){
                '', r.eD.trim(), '', o.eText, r.eT, r.note, S.op, 'v' + APP_VERSION, exp]);
     rows.push([t.id, '裝水 ' + t.kg + ' kg', t.kg, inStr(t.ld), fmt(t.ld.mm), fmt(t.ld.mm),
                r.lKg.trim(), r.lD.trim(), o.lDiff !== null ? sgn(o.lDiff) : '', '', r.lT, r.note, S.op, 'v' + APP_VERSION, exp]);
+    r.extra.forEach((x, i) => {
+      rows.push([t.id, '新增數據 ' + (i + 1), '', '', '', '',
+                 String(x.kg).trim(), String(x.d).trim(), '', '', x.t, r.note, S.op, 'v' + APP_VERSION, exp]);
+    });
   });
   const q = v => { v = v == null ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
   return '\uFEFF' + [head, ...rows].map(r => r.map(q).join(',')).join('\r\n');

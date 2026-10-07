@@ -1,5 +1,5 @@
 /* 槽頂距離紀錄 Service Worker — 版本需與 index.html 的 APP_VERSION 一致 */
-const VERSION = '1.0.3';
+const VERSION = '1.1.0';
 const CACHE = 'tank-headspace-v' + VERSION;
 const ASSETS = ['./', './index.html'];
 
